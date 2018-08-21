@@ -12,10 +12,10 @@ type Order struct {
 }
 
 type Order_public struct {
-	MarketID  int `json:"market_id"`
-	Price     int `json:"price"`
-	Amount    int `json:"amount"`
-	Total     int `json:"total"`
+	MarketID  int64 `json:"market_id"`
+	Price     int64 `json:"price"`
+	Amount    int64 `json:"amount"`
+	Total     int64 `json:"total"`
 	OrderType int `json:"order_type"`
 }
 

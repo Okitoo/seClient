@@ -1,7 +1,7 @@
 package seClient
 
 type Market struct {
-	ID        int    `json:"id"`
+	ID        int64    `json:"id"`
 	BaseCoin  string `json:"base_coin"`
 	AltCoin   string `json:"alt_coin"`
 	MakerFees int    `json:"maker_fees"`

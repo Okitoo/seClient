@@ -47,7 +47,7 @@ func (self *Client) ListMarkets() ([]*Market, error) {
 /*
  *	Public: Returns latest trade history of a single market
  */
-func (self *Client) ListMarketHistory(market_id int, limit int) (*Market_trade, error) {
+func (self *Client) ListMarketHistory(market_id int64, limit int) (*Market_trade, error) {
 	data, err := self.requestPublic(fmt.Sprintf("trades/%d", market_id), limit)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (self *Client) ListMarketHistory(market_id int, limit int) (*Market_trade, 
 /*
  *	Public: Returns all orders in the market
  */
-func (self *Client) ListMarketOrders(market_id int, limit int) (*Market_data, error) {
+func (self *Client) ListMarketOrders(market_id int64, limit int) (*Market_data, error) {
 	data, err := self.requestPublic(fmt.Sprintf("market/%d", market_id), limit)
 	if err != nil {
 		return nil, err
