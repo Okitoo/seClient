@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"errors"
+	"fmt"
 )
 
 type Client struct {
@@ -31,10 +32,49 @@ func New(endpoint string, optional_bot_key string, optional_bot_secret string) *
 }
 
 /*
- *	Returns all balances of the user
+ *	Public: Returns all markets
+ */
+func (self *Client) ListMarkets() ([]*Market, error) {
+	data, err := self.requestPublic("markets", 0)
+	if err != nil {
+		return nil, err
+	}
+	markets := []*Market{}
+	err = json.Unmarshal(data, &markets)
+	return markets, err
+}
+
+/*
+ *	Public: Returns latest trade history of a single market
+ */
+func (self *Client) ListMarketHistory(market_id int, limit int) (*Market_trade, error) {
+	data, err := self.requestPublic(fmt.Sprintf("trades/%d", market_id), limit)
+	if err != nil {
+		return nil, err
+	}
+	trades := &Market_trade{}
+	err = json.Unmarshal(data, &trades)
+	return trades, err
+}
+
+/*
+ *	Public: Returns all orders in the market
+ */
+func (self *Client) ListMarketOrders(market_id int, limit int) (*Market_data, error) {
+	data, err := self.requestPublic(fmt.Sprintf("market/%d", market_id), limit)
+	if err != nil {
+		return nil, err
+	}
+	market := &Market_data{}
+	err = json.Unmarshal(data, &market)
+	return market, err
+}
+
+/*
+ *	Private: Returns all balances of the user
  */
 func (self *Client) ListBalances() (map[string]*Balance, error) {
-	data, err := self.request("balances", "")
+	data, err := self.requestPrivate("balances", "")
 	if err != nil {
 		return nil, err
 	}
@@ -44,10 +84,10 @@ func (self *Client) ListBalances() (map[string]*Balance, error) {
 }
 
 /*
- *	Returns balance for a single coin
+ *	Private: Returns balance for a single coin
  */
 func (self *Client) GetBalance(coin_code string) (*Balance, error) {
-	data, err := self.request("balance", coin_code)
+	data, err := self.requestPrivate("balance", coin_code)
 	if err != nil {
 		return nil, err
 	}
@@ -57,10 +97,10 @@ func (self *Client) GetBalance(coin_code string) (*Balance, error) {
 }
 
 /*
- *	Returns all active orders of a user
+ *	Private: Returns all active orders of a user
  */
 func (self *Client) ListOrders(market_id int) ([]*Order, error) {
-	data, err := self.request("orders", market_id)
+	data, err := self.requestPrivate("orders", market_id)
 	if err != nil {
 		return nil, err
 	}
@@ -70,10 +110,10 @@ func (self *Client) ListOrders(market_id int) ([]*Order, error) {
 }
 
 /*
- *	Returns all withdraw addresses
+ *	Private: Returns all withdraw addresses
  */
 func (self *Client) ListWithdrawAddresses(coin_code string) ([]*Address_withdraw, error) {
-	data, err := self.request("withdraw/address", coin_code)
+	data, err := self.requestPrivate("withdraw/address", coin_code)
 	if err != nil {
 		return nil, err
 	}
@@ -83,10 +123,10 @@ func (self *Client) ListWithdrawAddresses(coin_code string) ([]*Address_withdraw
 }
 
 /*
- *	Withdraw to a saved address
+ *	Private: Withdraw to a saved address
  */
 func (self *Client) Withdraw(address_id int64, amount uint64) (bool, error) {
-	_, err := self.request("withdraw", struct {
+	_, err := self.requestPrivate("withdraw", struct {
 		Address_id int64  `json:"address_id"`
 		Amount     uint64 `json:"amount"`
 	}{
@@ -101,10 +141,10 @@ func (self *Client) Withdraw(address_id int64, amount uint64) (bool, error) {
 }
 
 /*
- *	Get a deposit address of a coin
+ *	Private: Get a deposit address of a coin
  */
 func (self *Client) Deposit(coin_code string) (*Address_deposit, error) {
-	data, err := self.request("deposit", coin_code)
+	data, err := self.requestPrivate("deposit", coin_code)
 	if err != nil {
 		return nil, err
 	}
@@ -114,10 +154,10 @@ func (self *Client) Deposit(coin_code string) (*Address_deposit, error) {
 }
 
 /*
- *	Creates a new order
+ *	Private: Creates a new order
  */
 func (self *Client) CreateOrder(market_id int64, price int64, amount int64, order_type int) (bool, error) {
-	_, err := self.request("orders/create", struct {
+	_, err := self.requestPrivate("orders/create", struct {
 		Market_id  int64 `json:"market_id"`
 		Price      int64 `json:"price"`
 		Amount     int64 `json:"amount"`
@@ -137,10 +177,10 @@ func (self *Client) CreateOrder(market_id int64, price int64, amount int64, orde
 }
 
 /*
- *	Cancels an order by id
+ *	Private: Cancels an order by id
  */
 func (self *Client) CancelOrder(order_id int64) (bool, error) {
-	_, err := self.request("orders/cancel", order_id)
+	_, err := self.requestPrivate("orders/cancel", order_id)
 	if err != nil {
 		return false, err
 	}
@@ -148,7 +188,33 @@ func (self *Client) CancelOrder(order_id int64) (bool, error) {
 	return true, nil
 }
 
-func (self *Client) request(path string, data interface{}) ([]byte, error) {
+//public requests
+func (self *Client) requestPublic(path string, limit int) ([]byte, error) {
+	limitTxt := ""
+	if limit > 0{
+		limitTxt = fmt.Sprintf("?limit=%d", limit)
+	}
+	req, err := http.Get(self.endpoint+path + limitTxt)
+	// Process response
+	if err != nil {
+		return []byte(nil), err
+	}
+	defer req.Body.Close()
+
+	b, err := ioutil.ReadAll(req.Body)
+	if err != nil{
+		return []byte(nil), err
+	}
+
+	if req.StatusCode >= 400 {
+		return []byte(nil), errors.New(string(b))
+	}
+
+	return b, nil
+}
+
+//private requests
+func (self *Client) requestPrivate(path string, data interface{}) ([]byte, error) {
 	payload, err := json.Marshal(data)
 	if err != nil {
 		return []byte(nil), err

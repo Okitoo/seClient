@@ -11,6 +11,14 @@ type Order struct {
 	Ts         int64  `json:"ts"`
 }
 
+type Order_public struct {
+	MarketID  int `json:"market_id"`
+	Price     int `json:"price"`
+	Amount    int `json:"amount"`
+	Total     int `json:"total"`
+	OrderType int `json:"order_type"`
+}
+
 const (
 	ORDER_TYPE_BUY = iota
 	ORDER_TYPE_SELL
