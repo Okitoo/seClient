@@ -14,7 +14,7 @@ type Market struct {
 			  High int `json:"High"`
 			  Low  int `json:"Low"`
 		  } `json:"high_low"`
-	Change24H     int    `json:"change_24h"`
+	Change24H     float64    `json:"change_24h"`
 	Market        string `json:"market"`
 	LastSellPrice int    `json:"last_sell_price"`
 }
