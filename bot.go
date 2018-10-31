@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 )
 
 type Client struct {
@@ -34,7 +34,7 @@ func New(endpoint string, optional_bot_key string, optional_bot_secret string) *
 /*
  *	Public: Returns all markets
  */
-func (self *Client) ListMarkets() ([]*Market, error) {
+func (self *Client) Public_ListMarkets() ([]*Market, error) {
 	data, err := self.requestPublic("markets", 0)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (self *Client) ListMarkets() ([]*Market, error) {
 /*
  *	Public: Returns latest trade history of a single market
  */
-func (self *Client) ListMarketHistory(market_id int64, limit int) (*Market_trade, error) {
+func (self *Client) Public_MarketHistory(market_id int64, limit int) (*Market_trade, error) {
 	data, err := self.requestPublic(fmt.Sprintf("trades/%d", market_id), limit)
 	if err != nil {
 		return nil, err
@@ -60,8 +60,8 @@ func (self *Client) ListMarketHistory(market_id int64, limit int) (*Market_trade
 /*
  *	Public: Returns all orders in the market
  */
-func (self *Client) ListMarketOrders(market_id int64, limit int) (*Market_data, error) {
-	data, err := self.requestPublic(fmt.Sprintf("market/%d", market_id), limit)
+func (self *Client) Public_GetMarketOrders(market_id interface{}, limit int) (*Market_data, error) {
+	data, err := self.requestPublic(fmt.Sprintf("market/%v", market_id), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -71,9 +71,26 @@ func (self *Client) ListMarketOrders(market_id int64, limit int) (*Market_data, 
 }
 
 /*
+ *	Public: Returns all orders in the market
+ */
+func (self *Client) Public_CreateInstaex(from_coin, to_coin, withdraw_addresses string) (*Instaex_create_response, error) {
+	data, err := self.requestPublicPost(fmt.Sprintf("instaex/create"), map[string]string{
+		"deposit":   from_coin,
+		"withdraw":  to_coin,
+		"addresses": withdraw_addresses,
+	})
+	if err != nil {
+		return nil, err
+	}
+	ixr := &Instaex_create_response{}
+	err = json.Unmarshal(data, &ixr)
+	return ixr, err
+}
+
+/*
  *	Private: Returns all balances of the user
  */
-func (self *Client) ListBalances() (map[string]*Balance, error) {
+func (self *Client) Private_ListBalances() (map[string]*Balance, error) {
 	data, err := self.requestPrivate("balances", "")
 	if err != nil {
 		return nil, err
@@ -86,7 +103,7 @@ func (self *Client) ListBalances() (map[string]*Balance, error) {
 /*
  *	Private: Returns balance for a single coin
  */
-func (self *Client) GetBalance(coin_code string) (*Balance, error) {
+func (self *Client) Private_GetCoinBalance(coin_code string) (*Balance, error) {
 	data, err := self.requestPrivate("balance", coin_code)
 	if err != nil {
 		return nil, err
@@ -99,7 +116,7 @@ func (self *Client) GetBalance(coin_code string) (*Balance, error) {
 /*
  *	Private: Returns all active orders of a user
  */
-func (self *Client) ListOrders(market_id int) ([]*Order, error) {
+func (self *Client) Private_ListMarketOrders(market_id interface{}) ([]*Order, error) {
 	data, err := self.requestPrivate("orders", market_id)
 	if err != nil {
 		return nil, err
@@ -112,7 +129,7 @@ func (self *Client) ListOrders(market_id int) ([]*Order, error) {
 /*
  *	Private: Returns all withdraw addresses
  */
-func (self *Client) ListWithdrawAddresses(coin_code string) ([]*Address_withdraw, error) {
+func (self *Client) Private_ListWithdrawAddrs(coin_code string) ([]*Address_withdraw, error) {
 	data, err := self.requestPrivate("withdraw/address", coin_code)
 	if err != nil {
 		return nil, err
@@ -123,9 +140,9 @@ func (self *Client) ListWithdrawAddresses(coin_code string) ([]*Address_withdraw
 }
 
 /*
- *	Private: Withdraw to a saved address
+ *	Private: Private_withdraw to a saved address
  */
-func (self *Client) Withdraw(address_id int64, amount uint64) (bool, error) {
+func (self *Client) Private_withdraw(address_id int64, amount uint64) (bool, error) {
 	_, err := self.requestPrivate("withdraw", struct {
 		Address_id int64  `json:"address_id"`
 		Amount     uint64 `json:"amount"`
@@ -143,7 +160,7 @@ func (self *Client) Withdraw(address_id int64, amount uint64) (bool, error) {
 /*
  *	Private: Get a deposit address of a coin
  */
-func (self *Client) Deposit(coin_code string) (*Address_deposit, error) {
+func (self *Client) Private_deposit(coin_code string) (*Address_deposit, error) {
 	data, err := self.requestPrivate("deposit", coin_code)
 	if err != nil {
 		return nil, err
@@ -191,10 +208,10 @@ func (self *Client) CancelOrder(order_id int64) (bool, error) {
 //public requests
 func (self *Client) requestPublic(path string, limit int) ([]byte, error) {
 	limitTxt := ""
-	if limit > 0{
+	if limit > 0 {
 		limitTxt = fmt.Sprintf("?limit=%d", limit)
 	}
-	req, err := http.Get(self.endpoint+path + limitTxt)
+	req, err := http.Get(self.endpoint + path + limitTxt)
 	// Process response
 	if err != nil {
 		return []byte(nil), err
@@ -202,11 +219,40 @@ func (self *Client) requestPublic(path string, limit int) ([]byte, error) {
 	defer req.Body.Close()
 
 	b, err := ioutil.ReadAll(req.Body)
-	if err != nil{
+	if err != nil {
 		return []byte(nil), err
 	}
 
 	if req.StatusCode >= 400 {
+		return []byte(nil), errors.New(string(b))
+	}
+
+	return b, nil
+}
+
+//public requests
+func (self *Client) requestPublicPost(path string, params interface{}) ([]byte, error) {
+	final_payload, _ := json.Marshal(params)
+	req, err := http.NewRequest("POST", self.endpoint+path, bytes.NewBuffer(final_payload))
+	if err != nil {
+		return []byte(nil), err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := self.client.Do(req)
+	if err != nil {
+		return []byte(nil), err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		return []byte(nil), err
+	}
+
+	if resp.StatusCode >= 400 {
 		return []byte(nil), errors.New(string(b))
 	}
 
